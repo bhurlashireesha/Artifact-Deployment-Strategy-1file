@@ -1,15 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
     <types>
-        <members>ved__c</members>
+        <members>shashi__c</members>
         <name>CustomObject</name>
     </types>
-        <types>
-        <members>ved__c.no__c</members>
-        <name>CustomField</name>
-    </types>
-        <types>
-        <members>ved__c-ved Layout</members>
+    <types>
+        <members>shashi__c-shashi Layout</members>
         <name>Layout</name>
     </types>
     <version>67.0</version>
