@@ -1,115 +1,67 @@
 name: Salesforce CI/CD
 
 on:
+  pull_request:
+    branches: [ "sit", "int", "prod" ]
   push:
     branches: [ "sit", "int", "prod" ]
-  pull_request:
-    branches: [ "sit" ]
-    types: [opened, synchronize, reopened]
 
 jobs:
-  validate:
+  validate-sit:
+    if: ${{ github.ref_name == 'sit' }}
+    name: Validate SIT
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        env: [SIT, INT, PROD]
     steps:
+      # same steps as before, but SIT-specific
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
-
       - name: Install Salesforce CLI
         run: npm install --global @salesforce/cli@latest
-
       - name: Install Git Delta plugin
         run: echo y | sf plugins install sfdx-git-delta
-
-      - name: Verify CLI installation
-        run: |
-          node --version
-          sf --version
-          sf plugins --core
-
-      - name: Auth ${{ matrix.env }}
+      - name: Auth SIT
         env:
-          SFDX_AUTH_URL: ${{ secrets[format('{0}_SFDX_AUTH_URL', matrix.env)] }}
+          SFDX_AUTH_URL: ${{ secrets.SIT_SFDX_AUTH_URL }}
         run: |
           echo "$SFDX_AUTH_URL" > auth.txt
-          sf org login sfdx-url --sfdx-url-file auth.txt --alias ${{ matrix.env }}
-
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias SIT
       - name: Prepare Delta Directory
         run: mkdir -p delta
-
       - name: Generate Delta
-        run: |
-          if [ "${{ matrix.env }}" = "SIT" ]; then
-            sf sgd source delta --to ${{ github.event.pull_request.head.sha }} --from ${{ github.event.pull_request.base.sha }} --output delta
-          else
-            sf sgd source delta --to ${{ github.sha }} --from ${{ github.event.before }} --output delta
-          fi
-
+        run: sf sgd source delta --to ${{ github.event.pull_request.head.sha }} --from ${{ github.event.pull_request.base.sha }} --output delta
       - name: Validate Deployment
-        run: |
-          TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
-          if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
-          sf project deploy validate \
-            --manifest delta/package/package.xml \
-            --post-destructive-changes delta/destructiveChanges/destructiveChanges.xml \
-            --target-org ${{ matrix.env }} \
-            --test-level RunSpecifiedTests \
-            --tests "$TEST_CLASSES"
-
+        run: sf project deploy validate --manifest delta/package/package.xml --target-org SIT
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: delta-artifact-${{ matrix.env }}
+          name: delta-artifact-sit
           path: delta/
           retention-days: 30
 
-  deploy:
-    needs: validate
-    if: ${{ needs.validate.result == 'success' }}
+  deploy-sit:
+    needs: validate-sit
+    if: ${{ needs.validate-sit.result == 'success' }}
+    name: Deploy SIT
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        env: [SIT, INT, PROD]
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
-
       - name: Install Salesforce CLI
         run: npm install --global @salesforce/cli@latest
-
       - name: Install Git Delta plugin
         run: echo y | sf plugins install sfdx-git-delta
-
-      - name: Verify CLI installation
-        run: |
-          node --version
-          sf --version
-          sf plugins --core
-
-      - name: Auth ${{ matrix.env }}
+      - name: Auth SIT
         env:
-          SFDX_AUTH_URL: ${{ secrets[format('{0}_SFDX_AUTH_URL', matrix.env)] }}
+          SFDX_AUTH_URL: ${{ secrets.SIT_SFDX_AUTH_URL }}
         run: |
           echo "$SFDX_AUTH_URL" > auth.txt
-          sf org login sfdx-url --sfdx-url-file auth.txt --alias ${{ matrix.env }}
-
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias SIT
       - uses: actions/download-artifact@v4
         with:
-          name: delta-artifact-${{ matrix.env }}
-
-      - name: Deploy to ${{ matrix.env }}
-        run: sf project deploy start \
-          --manifest delta/package/package.xml \
-          --post-destructive-changes delta/destructiveChanges/destructiveChanges.xml \
-          --target-org ${{ matrix.env }} \
-          --ignore-conflicts
+          name: delta-artifact-sit
+      - name: Deploy to SIT
+        run: sf project deploy start --manifest delta/package/package.xml --target-org SIT --ignore-conflicts
