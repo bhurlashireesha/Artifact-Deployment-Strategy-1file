@@ -29,10 +29,11 @@ jobs:
         run: |
           TO_SHA=${{ github.event.pull_request.head.sha }}
           FROM_SHA=${{ github.event.pull_request.base.sha }}
-          if [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
-            echo "FROM_SHA is null, using root commit instead."
+          if [ -z "$FROM_SHA" ] || [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "FROM_SHA is empty or null, using root commit instead."
             FROM_SHA=$(git rev-list --max-parents=0 HEAD)
           fi
+          echo "Generating delta from $FROM_SHA to $TO_SHA"
           ./scripts/delta.sh $TO_SHA $FROM_SHA
       - name: Validate Deployment
         run: |
@@ -69,10 +70,11 @@ jobs:
         run: |
           TO_SHA=${{ github.sha }}
           FROM_SHA=${{ github.event.before }}
-          if [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
-            echo "FROM_SHA is null, using root commit instead."
+          if [ -z "$FROM_SHA" ] || [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "FROM_SHA is empty or null, using root commit instead."
             FROM_SHA=$(git rev-list --max-parents=0 HEAD)
           fi
+          echo "Generating delta from $FROM_SHA to $TO_SHA"
           ./scripts/delta.sh $TO_SHA $FROM_SHA
       - name: Validate Deployment
         run: |
@@ -109,10 +111,11 @@ jobs:
         run: |
           TO_SHA=${{ github.sha }}
           FROM_SHA=${{ github.event.before }}
-          if [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
-            echo "FROM_SHA is null, using root commit instead."
+          if [ -z "$FROM_SHA" ] || [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "FROM_SHA is empty or null, using root commit instead."
             FROM_SHA=$(git rev-list --max-parents=0 HEAD)
           fi
+          echo "Generating delta from $FROM_SHA to $TO_SHA"
           ./scripts/delta.sh $TO_SHA $FROM_SHA
       - name: Deploy to INT
         run: |
