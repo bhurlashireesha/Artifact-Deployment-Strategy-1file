@@ -35,8 +35,19 @@ jobs:
       - name: Prepare Delta Directory
         run: mkdir -p delta
 
-      - name: Generate Delta
-        run: sf sgd source delta --to ${{ github.event.pull_request.head.sha }} --from ${{ github.event.pull_request.base.sha }} --output delta
+      - name: Generate Delta (PR)
+        if: ${{ github.event_name == 'pull_request' }}
+        run: sf sgd source delta \
+              --to ${{ github.event.pull_request.head.sha }} \
+              --from ${{ github.event.pull_request.base.sha }} \
+              --output delta
+
+      - name: Generate Delta (Push)
+        if: ${{ github.event_name == 'push' }}
+        run: sf sgd source delta \
+              --to ${{ github.sha }} \
+              --from ${{ github.event.before }} \
+              --output delta
 
       - name: Validate Deployment
         run: |
@@ -105,8 +116,18 @@ jobs:
           sf org login sfdx-url --sfdx-url-file auth.txt --alias INT
       - name: Prepare Delta Directory
         run: mkdir -p delta
-      - name: Generate Delta
-        run: sf sgd source delta --to ${{ github.sha }} --from ${{ github.event.before }} --output delta
+      - name: Generate Delta (PR)
+        if: ${{ github.event_name == 'pull_request' }}
+        run: sf sgd source delta \
+              --to ${{ github.event.pull_request.head.sha }} \
+              --from ${{ github.event.pull_request.base.sha }} \
+              --output delta
+      - name: Generate Delta (Push)
+        if: ${{ github.event_name == 'push' }}
+        run: sf sgd source delta \
+              --to ${{ github.sha }} \
+              --from ${{ github.event.before }} \
+              --output delta
       - name: Validate Deployment
         run: |
           TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
@@ -173,8 +194,18 @@ jobs:
           sf org login sfdx-url --sfdx-url-file auth.txt --alias PROD
       - name: Prepare Delta Directory
         run: mkdir -p delta
-      - name: Generate Delta
-        run: sf sgd source delta --to ${{ github.sha }} --from ${{ github.event.before }} --output delta
+      - name: Generate Delta (PR)
+        if: ${{ github.event_name == 'pull_request' }}
+        run: sf sgd source delta \
+              --to ${{ github.event.pull_request.head.sha }} \
+              --from ${{ github.event.pull_request.base.sha }} \
+              --output delta
+      - name: Generate Delta (Push)
+        if: ${{ github.event_name == 'push' }}
+        run: sf sgd source delta \
+              --to ${{ github.sha }} \
+              --from ${{ github.event.before }} \
+              --output delta
       - name: Validate Deployment
         run: |
           TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
@@ -194,25 +225,4 @@ jobs:
   deploy-prod:
     needs: validate-prod
     if: ${{ needs.validate-prod.result == 'success' }}
-    name: Deploy PROD
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "24"
-      - name: Install Salesforce CLI
-        run: npm install --global @salesforce/cli@latest
-      - name: Install Git Delta plugin
-        run: echo y | sf plugins install sfdx-git-delta
-      - name: Auth PROD
-        env:
-          SFDX_AUTH_URL: ${{ secrets.PROD_SFDX_AUTH_URL }}
-        run: |
-          echo "$SFDX_AUTH_URL" > auth.txt
-          sf org login sfdx-url --sfdx-url-file auth.txt --alias PROD
-      - uses: actions/download-artifact@v4
-        with:
-          name: delta-artifact-prod
-      - name: Deploy to PROD
-        run: sf project deploy start --manifest delta/package/package.xml --target-org PROD --ignore-conflicts
+    name
