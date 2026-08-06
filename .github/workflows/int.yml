@@ -24,7 +24,14 @@ jobs:
           echo "${{ secrets.INT_SFDX_AUTH_URL }}" > auth.txt
           sf org login sfdx-url --sfdx-url-file auth.txt --alias INT
       - name: Generate Delta
-        run: ./scripts/delta.sh ${{ github.event.pull_request.head.sha }} ${{ github.event.pull_request.base.sha }}
+        run: |
+          FROM_SHA=${{ github.event.before }}
+          TO_SHA=${{ github.sha }}
+          if [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
+          echo "First commit/tag push detected, using initial commit diff."
+          FROM_SHA=$(git rev-list --max-parents=0 HEAD)
+           fi
+          ./scripts/delta.sh $TO_SHA $FROM_SHA
       - name: Validate Deployment
         run: |
           TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
