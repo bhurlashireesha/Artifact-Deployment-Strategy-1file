@@ -2,6 +2,7 @@ name: INT Deployment
 
 on:
   pull_request:
+    types: [opened, reopened]
     branches: [ "int" ]
   push:
     tags:
