@@ -1,20 +1,50 @@
+name: SIT Deployment
+
+on:
+  pull_request:
+    branches: [ "sit" ]
+  push:
+    branches: [ "sit" ]
+
 jobs:
   validate-deploy-sit:
     runs-on: ubuntu-latest
-      steps:
+    steps:
+      # Checkout full history so SHAs are valid
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      # Setup Node.js
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
-      - run: npm install --global @salesforce/cli
-      - run: echo y | sf plugins install sfdx-git-delta
+
+      # Install Salesforce CLI and Git Delta plugin
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli
+      - name: Install Git Delta plugin
+        run: echo y | sf plugins install sfdx-git-delta
+
+      # Ensure helper scripts are executable
       - name: Ensure scripts are executable
         run: chmod +x scripts/*.sh
+
+      # Authenticate to SIT org
       - name: Auth SIT
-        run: echo "${{ secrets.SIT_SFDX_AUTH_URL }}" > auth.txt && sf org login sfdx-url --sfdx-url-file auth.txt --alias SIT
-      - name: Generate Delta
+        run: |
+          echo "${{ secrets.SIT_SFDX_AUTH_URL }}" > auth.txt
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias SIT
+
+      # Generate delta depending on event type
+      - name: Generate Delta (PR)
+        if: ${{ github.event_name == 'pull_request' }}
         run: ./scripts/delta.sh ${{ github.event.pull_request.head.sha }} ${{ github.event.pull_request.base.sha }}
+
+      - name: Generate Delta (Push)
+        if: ${{ github.event_name == 'push' }}
+        run: ./scripts/delta.sh ${{ github.sha }} ${{ github.event.before }}
+
+      # Deploy to SIT
       - name: Deploy to SIT
         run: sf project deploy start --manifest delta/package/package.xml --target-org SIT --ignore-conflicts
