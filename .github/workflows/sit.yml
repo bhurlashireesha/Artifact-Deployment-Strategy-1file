@@ -1,0 +1,23 @@
+name: SIT Deployment
+
+on:
+  pull_request:
+    branches: [ "sit" ]
+  push:
+    branches: [ "sit" ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: "24" }
+      - run: npm install --global @salesforce/cli
+      - run: echo y | sf plugins install sfdx-git-delta
+      - name: Auth SIT
+        run: echo "${{ secrets.SIT_SFDX_AUTH_URL }}" > auth.txt && sf org login sfdx-url --sfdx-url-file auth.txt --alias SIT
+      - name: Generate Delta
+        run: ./scripts/delta.sh ${{ github.event.pull_request.head.sha }} ${{ github.event.pull_request.base.sha }}
+      - name: Deploy to SIT
+        run: sf project deploy start --manifest delta/package/package.xml --target-org SIT --ignore-conflicts
