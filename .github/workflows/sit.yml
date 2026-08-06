@@ -1,13 +1,14 @@
-name: SIT Deployment
+name: INT Deployment
 
 on:
   pull_request:
-    branches: [ "sit" ]
+    branches: [ "int" ]
   push:
-    branches: [ "sit" ]
+    tags:
+      - "int-*"
 
 jobs:
-  validate-sit:
+  validate-int-pr:
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
@@ -18,23 +19,30 @@ jobs:
       - run: npm install --global @salesforce/cli
       - run: echo y | sf plugins install sfdx-git-delta
       - run: chmod +x scripts/*.sh
-      - name: Auth SIT
+      - name: Auth INT
         run: |
-          echo "${{ secrets.SIT_SFDX_AUTH_URL }}" > auth.txt
-          sf org login sfdx-url --sfdx-url-file auth.txt --alias SIT
+          echo "${{ secrets.INT_SFDX_AUTH_URL }}" > auth.txt
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias INT
       - name: Generate Delta
-        run: ./scripts/delta.sh ${{ github.event.pull_request.head.sha }} ${{ github.event.pull_request.base.sha }}
+        run: |
+          FROM_SHA=${{ github.event.before }}
+          TO_SHA=${{ github.sha }}
+          if [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
+          echo "First commit/tag push detected, using initial commit diff."
+          FROM_SHA=$(git rev-list --max-parents=0 HEAD)
+           fi
+          ./scripts/delta.sh $TO_SHA $FROM_SHA
       - name: Validate Deployment
         run: |
           TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
           if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
           sf project deploy validate \
             --manifest delta/package/package.xml \
-            --target-org SIT \
+            --target-org INT \
             --test-level RunSpecifiedTests \
             --tests "$TEST_CLASSES"
 
-  deploy-sit:
+  validate-int-tag:
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     steps:
@@ -45,18 +53,45 @@ jobs:
       - run: npm install --global @salesforce/cli
       - run: echo y | sf plugins install sfdx-git-delta
       - run: chmod +x scripts/*.sh
-      - name: Auth SIT
+      - name: Auth INT
         run: |
-          echo "${{ secrets.SIT_SFDX_AUTH_URL }}" > auth.txt
-          sf org login sfdx-url --sfdx-url-file auth.txt --alias SIT
+          echo "${{ secrets.INT_SFDX_AUTH_URL }}" > auth.txt
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias INT
       - name: Generate Delta
         run: ./scripts/delta.sh ${{ github.sha }} ${{ github.event.before }}
-      - name: Deploy to SIT
+      - name: Validate Deployment
+        run: |
+          TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
+          if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
+          sf project deploy validate \
+            --manifest delta/package/package.xml \
+            --target-org INT \
+            --test-level RunSpecifiedTests \
+            --tests "$TEST_CLASSES"
+
+  deploy-int:
+    needs: validate-int-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: "24" }
+      - run: npm install --global @salesforce/cli
+      - run: echo y | sf plugins install sfdx-git-delta
+      - run: chmod +x scripts/*.sh
+      - name: Auth INT
+        run: |
+          echo "${{ secrets.INT_SFDX_AUTH_URL }}" > auth.txt
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias INT
+      - name: Generate Delta
+        run: ./scripts/delta.sh ${{ github.sha }} ${{ github.event.before }}
+      - name: Deploy to INT
         run: |
           TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
           if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
           sf project deploy start \
             --manifest delta/package/package.xml \
-            --target-org SIT \
+            --target-org INT \
             --test-level RunSpecifiedTests \
             --tests "$TEST_CLASSES"
