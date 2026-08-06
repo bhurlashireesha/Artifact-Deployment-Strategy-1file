@@ -1,8 +1,21 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
     <types>
+<<<<<<< HEAD
         <members>Pachi__c</members>
         <name>CustomObject</name>
+=======
+        <members>ved__c</members>
+        <name>CustomObject</name>
+    </types>
+        <types>
+        <members>ved__c.no__c</members>
+        <name>CustomField</name>
+    </types>
+        <types>
+        <members>ved__c-ved Layout</members>
+        <name>Layout</name>
+>>>>>>> 6679d70d593e542ad79c34797c29169935538f19
     </types>
     <version>67.0</version>
 </Package>

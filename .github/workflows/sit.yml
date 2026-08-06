@@ -1,0 +1,62 @@
+name: SIT Deployment
+
+on:
+  pull_request:
+    branches: [ "sit" ]
+  push:
+    branches: [ "sit" ]
+
+jobs:
+  validate-sit:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: "24" }
+      - run: npm install --global @salesforce/cli
+      - run: echo y | sf plugins install sfdx-git-delta
+      - run: chmod +x scripts/*.sh
+      - name: Auth SIT
+        run: |
+          echo "${{ secrets.SIT_SFDX_AUTH_URL }}" > auth.txt
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias SIT
+      - name: Generate Delta
+        run: ./scripts/delta.sh ${{ github.event.pull_request.head.sha }} ${{ github.event.pull_request.base.sha }}
+      - name: Validate Deployment
+        run: |
+          TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
+          if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
+          sf project deploy validate \
+            --manifest delta/package/package.xml \
+            --target-org SIT \
+            --test-level RunSpecifiedTests \
+            --tests "$TEST_CLASSES"
+
+  deploy-sit:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: "24" }
+      - run: npm install --global @salesforce/cli
+      - run: echo y | sf plugins install sfdx-git-delta
+      - run: chmod +x scripts/*.sh
+      - name: Auth SIT
+        run: |
+          echo "${{ secrets.SIT_SFDX_AUTH_URL }}" > auth.txt
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias SIT
+      - name: Generate Delta
+        run: ./scripts/delta.sh ${{ github.sha }} ${{ github.event.before }}
+      - name: Deploy to SIT
+        run: |
+          TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
+          if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
+          sf project deploy start \
+            --manifest delta/package/package.xml \
+            --target-org SIT \
+            --test-level RunSpecifiedTests \
+            --tests "$TEST_CLASSES"
