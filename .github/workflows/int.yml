@@ -13,9 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v5
-        with: { node-version: "24" }
+        with:
+          node-version: "24"
       - run: npm install --global @salesforce/cli
       - run: echo y | sf plugins install sfdx-git-delta
       - run: chmod +x scripts/*.sh
@@ -24,9 +26,20 @@ jobs:
           echo "${{ secrets.INT_SFDX_AUTH_URL }}" > auth.txt
           sf org login sfdx-url --sfdx-url-file auth.txt --alias INT
       - name: Generate Delta
-        run: ./scripts/delta.sh ${{ github.event.pull_request.head.sha }} ${{ github.event.pull_request.base.sha }}
+        run: |
+          TO_SHA=${{ github.event.pull_request.head.sha }}
+          FROM_SHA=${{ github.event.pull_request.base.sha }}
+          if [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "FROM_SHA is null, using root commit instead."
+            FROM_SHA=$(git rev-list --max-parents=0 HEAD)
+          fi
+          ./scripts/delta.sh $TO_SHA $FROM_SHA
       - name: Validate Deployment
         run: |
+          if [ ! -s delta/package/package.xml ]; then
+            echo "No changes detected, skipping validation."
+            exit 0
+          fi
           TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
           if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
           sf project deploy validate \
@@ -40,9 +53,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v5
-        with: { node-version: "24" }
+        with:
+          node-version: "24"
       - run: npm install --global @salesforce/cli
       - run: echo y | sf plugins install sfdx-git-delta
       - run: chmod +x scripts/*.sh
@@ -51,9 +66,20 @@ jobs:
           echo "${{ secrets.INT_SFDX_AUTH_URL }}" > auth.txt
           sf org login sfdx-url --sfdx-url-file auth.txt --alias INT
       - name: Generate Delta
-        run: ./scripts/delta.sh ${{ github.sha }} ${{ github.event.before }}
+        run: |
+          TO_SHA=${{ github.sha }}
+          FROM_SHA=${{ github.event.before }}
+          if [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "FROM_SHA is null, using root commit instead."
+            FROM_SHA=$(git rev-list --max-parents=0 HEAD)
+          fi
+          ./scripts/delta.sh $TO_SHA $FROM_SHA
       - name: Validate Deployment
         run: |
+          if [ ! -s delta/package/package.xml ]; then
+            echo "No changes detected, skipping validation."
+            exit 0
+          fi
           TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
           if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
           sf project deploy validate \
@@ -67,9 +93,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v5
-        with: { node-version: "24" }
+        with:
+          node-version: "24"
       - run: npm install --global @salesforce/cli
       - run: echo y | sf plugins install sfdx-git-delta
       - run: chmod +x scripts/*.sh
@@ -78,9 +106,20 @@ jobs:
           echo "${{ secrets.INT_SFDX_AUTH_URL }}" > auth.txt
           sf org login sfdx-url --sfdx-url-file auth.txt --alias INT
       - name: Generate Delta
-        run: ./scripts/delta.sh ${{ github.sha }} ${{ github.event.before }}
+        run: |
+          TO_SHA=${{ github.sha }}
+          FROM_SHA=${{ github.event.before }}
+          if [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "FROM_SHA is null, using root commit instead."
+            FROM_SHA=$(git rev-list --max-parents=0 HEAD)
+          fi
+          ./scripts/delta.sh $TO_SHA $FROM_SHA
       - name: Deploy to INT
         run: |
+          if [ ! -s delta/package/package.xml ]; then
+            echo "No changes detected, skipping deployment."
+            exit 0
+          fi
           TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
           if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
           sf project deploy start \
