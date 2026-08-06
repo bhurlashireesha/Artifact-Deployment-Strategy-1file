@@ -1,8 +1,16 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
     <types>
-        <members>nithwik__c</members>
+        <members>ved__c</members>
         <name>CustomObject</name>
+    </types>
+        <types>
+        <members>ved__c.no__c</members>
+        <name>CustomField</name>
+    </types>
+        <types>
+        <members>ved__c-ved Layout</members>
+        <name>Layout</name>
     </types>
     <version>67.0</version>
 </Package>
