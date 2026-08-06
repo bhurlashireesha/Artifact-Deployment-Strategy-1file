@@ -10,33 +10,27 @@ jobs:
   validate-deploy-sit:
     runs-on: ubuntu-latest
     steps:
-      # Checkout full history so SHAs are valid
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      # Setup Node.js
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
 
-      # Install Salesforce CLI and Git Delta plugin
       - name: Install Salesforce CLI
         run: npm install --global @salesforce/cli
       - name: Install Git Delta plugin
         run: echo y | sf plugins install sfdx-git-delta
 
-      # Ensure helper scripts are executable
       - name: Ensure scripts are executable
         run: chmod +x scripts/*.sh
 
-      # Authenticate to SIT org
       - name: Auth SIT
         run: |
           echo "${{ secrets.SIT_SFDX_AUTH_URL }}" > auth.txt
           sf org login sfdx-url --sfdx-url-file auth.txt --alias SIT
 
-      # Generate delta depending on event type
       - name: Generate Delta (PR)
         if: ${{ github.event_name == 'pull_request' }}
         run: ./scripts/delta.sh ${{ github.event.pull_request.head.sha }} ${{ github.event.pull_request.base.sha }}
@@ -45,6 +39,12 @@ jobs:
         if: ${{ github.event_name == 'push' }}
         run: ./scripts/delta.sh ${{ github.sha }} ${{ github.event.before }}
 
-      # Deploy to SIT
-      - name: Deploy to SIT
-        run: sf project deploy start --manifest delta/package/package.xml --target-org SIT --ignore-conflicts
+      - name: Validate Deployment
+        run: |
+          TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
+          if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
+          sf project deploy validate \
+            --manifest delta/package/package.xml \
+            --target-org SIT \
+            --test-level RunSpecifiedTests \
+            --tests "$TEST_CLASSES"
