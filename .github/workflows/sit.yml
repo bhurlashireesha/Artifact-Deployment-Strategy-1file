@@ -12,12 +12,22 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
-        with: { node-version: "24" }
-      - run: npm install --global @salesforce/cli
-      - run: echo y | sf plugins install sfdx-git-delta
+        with:
+          node-version: "24"
+
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli
+      - name: Install Git Delta plugin
+        run: echo y | sf plugins install sfdx-git-delta
+
+      - name: Ensure scripts are executable
+        run: chmod +x scripts/*.sh
+
       - name: Auth SIT
         run: echo "${{ secrets.SIT_SFDX_AUTH_URL }}" > auth.txt && sf org login sfdx-url --sfdx-url-file auth.txt --alias SIT
+
       - name: Generate Delta
         run: ./scripts/delta.sh ${{ github.event.pull_request.head.sha }} ${{ github.event.pull_request.base.sha }}
+
       - name: Deploy to SIT
         run: sf project deploy start --manifest delta/package/package.xml --target-org SIT --ignore-conflicts
