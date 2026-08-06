@@ -1,22 +1,85 @@
+name: INT Deployment
+
+on:
+  pull_request:
+    branches: [ "int" ]
+  push:
+    tags:
+      - "int-*"
+
 jobs:
-  validate-deploy-int:
+  validate-int-pr:
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
-     steps:
+    steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
+        with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
-        with:
-          node-version: "24"
+        with: { node-version: "24" }
       - run: npm install --global @salesforce/cli
       - run: echo y | sf plugins install sfdx-git-delta
-      - name: Ensure scripts are executable
-        run: chmod +x scripts/*.sh
+      - run: chmod +x scripts/*.sh
       - name: Auth INT
-        run: echo "${{ secrets.INT_SFDX_AUTH_URL }}" > auth.txt && sf org login sfdx-url --sfdx-url-file auth.txt --alias INT
+        run: |
+          echo "${{ secrets.INT_SFDX_AUTH_URL }}" > auth.txt
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias INT
+      - name: Generate Delta
+        run: ./scripts/delta.sh ${{ github.event.pull_request.head.sha }} ${{ github.event.pull_request.base.sha }}
+      - name: Validate Deployment
+        run: |
+          TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
+          if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
+          sf project deploy validate \
+            --manifest delta/package/package.xml \
+            --target-org INT \
+            --test-level RunSpecifiedTests \
+            --tests "$TEST_CLASSES"
+
+  validate-int-tag:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: "24" }
+      - run: npm install --global @salesforce/cli
+      - run: echo y | sf plugins install sfdx-git-delta
+      - run: chmod +x scripts/*.sh
+      - name: Auth INT
+        run: |
+          echo "${{ secrets.INT_SFDX_AUTH_URL }}" > auth.txt
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias INT
       - name: Generate Delta
         run: ./scripts/delta.sh ${{ github.sha }} ${{ github.event.before }}
-      - name: RunSpecifiedTests and Deploy
+      - name: Validate Deployment
+        run: |
+          TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
+          if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
+          sf project deploy validate \
+            --manifest delta/package/package.xml \
+            --target-org INT \
+            --test-level RunSpecifiedTests \
+            --tests "$TEST_CLASSES"
+
+  deploy-int:
+    needs: validate-int-tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: "24" }
+      - run: npm install --global @salesforce/cli
+      - run: echo y | sf plugins install sfdx-git-delta
+      - run: chmod +x scripts/*.sh
+      - name: Auth INT
+        run: |
+          echo "${{ secrets.INT_SFDX_AUTH_URL }}" > auth.txt
+          sf org login sfdx-url --sfdx-url-file auth.txt --alias INT
+      - name: Generate Delta
+        run: ./scripts/delta.sh ${{ github.sha }} ${{ github.event.before }}
+      - name: Deploy to INT
         run: |
           TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
           if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
