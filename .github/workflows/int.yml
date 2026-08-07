@@ -5,9 +5,8 @@ on:
     types: [opened, reopened, synchronize]
     branches: [ "int" ]
   push:
-    branches: [ "int" ]        # <— added so merges into int trigger validation
     tags:
-      - "int-*"
+      - "INT-*"
 
 jobs:
   validate-int-pr:
@@ -49,8 +48,44 @@ jobs:
             --test-level RunSpecifiedTests \
             --tests "$TEST_CLASSES"
 
-  validate-int-push:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/int'
+  create-int-tag:
+    needs: validate-int-pr
+    if: success()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Determine next tag
+        id: tag
+        run: |
+          # Fetch all tags
+          git fetch --tags
+          LAST_TAG=$(git tag --list "INT-*" | sort -V | tail -n1)
+
+          if [ -z "$LAST_TAG" ]; then
+            NEW_TAG="INT-release1Sprint1-v1.0"
+          else
+            # Extract numeric version at the end (vX.Y)
+            VERSION=$(echo $LAST_TAG | grep -oE 'v[0-9]+\.[0-9]+$' | sed 's/v//')
+            MAJOR=$(echo $VERSION | cut -d. -f1)
+            MINOR=$(echo $VERSION | cut -d. -f2)
+            NEW_MINOR=$((MINOR+1))
+            NEW_TAG="INT-release1Sprint1-v${MAJOR}.${NEW_MINOR}"
+          fi
+
+          echo "New tag will be $NEW_TAG"
+          echo "tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.tag.outputs.tag }}
+          git push origin ${{ steps.tag.outputs.tag }}
+
+  validate-int-tag:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/INT-')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -74,7 +109,7 @@ jobs:
             FROM_SHA=$(git rev-list --max-parents=0 HEAD)
           fi
           ./scripts/delta.sh $TO_SHA $FROM_SHA
-      - name: Validate Deployment (merge commit)
+      - name: Validate Deployment (tag)
         run: |
           if [ ! -s delta/package/package.xml ]; then
             echo "No changes detected, skipping validation."
@@ -88,8 +123,8 @@ jobs:
             --test-level RunSpecifiedTests \
             --tests "$TEST_CLASSES"
 
-  validate-int-tag:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/int-')
+  deploy-int:
+    needs: validate-int-tag
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -112,3 +147,17 @@ jobs:
           if [ -z "$FROM_SHA" ] || [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
             FROM_SHA=$(git rev-list --max-parents=0 HEAD)
           fi
+          ./scripts/delta.sh $TO_SHA $FROM_SHA
+      - name: Deploy to INT
+        run: |
+          if [ ! -s delta/package/package.xml ]; then
+            echo "No changes detected, skipping deployment."
+            exit 0
+          fi
+          TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
+          if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
+          sf project deploy start \
+            --manifest delta/package/package.xml \
+            --target-org INT \
+            --test-level RunSpecifiedTests \
+            --tests "$TEST_CLASSES"
