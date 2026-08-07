@@ -29,10 +29,8 @@ jobs:
           TO_SHA=${{ github.event.pull_request.head.sha }}
           FROM_SHA=${{ github.event.pull_request.base.sha }}
           if [ -z "$FROM_SHA" ] || [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
-            echo "FROM_SHA is empty or null, using root commit instead."
             FROM_SHA=$(git rev-list --max-parents=0 HEAD)
           fi
-          echo "Generating delta from $FROM_SHA to $TO_SHA"
           ./scripts/delta.sh $TO_SHA $FROM_SHA
       - name: Validate Deployment
         run: |
@@ -70,12 +68,10 @@ jobs:
           TO_SHA=${{ github.sha }}
           FROM_SHA=${{ github.event.before }}
           if [ -z "$FROM_SHA" ] || [ "$FROM_SHA" = "0000000000000000000000000000000000000000" ]; then
-            echo "FROM_SHA is empty or null, using root commit instead."
             FROM_SHA=$(git rev-list --max-parents=0 HEAD)
           fi
-          echo "Generating delta from $FROM_SHA to $TO_SHA"
           ./scripts/delta.sh $TO_SHA $FROM_SHA
-      - name: Deploy to SIT
+      - name: Deploy to SIT (ignore conflicts)
         run: |
           if [ ! -s delta/package/package.xml ]; then
             echo "No changes detected, skipping deployment."
@@ -87,4 +83,5 @@ jobs:
             --manifest delta/package/package.xml \
             --target-org SIT \
             --test-level RunSpecifiedTests \
-            --tests "$TEST_CLASSES"
+            --tests "$TEST_CLASSES" \
+            --ignore-conflicts
