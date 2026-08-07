@@ -1,4 +1,4 @@
-\name: SIT Deployment
+name: SIT Deployment
 
 on:
   pull_request:
