@@ -9,6 +9,9 @@ on:
     tags:
       - "INT-*"
 
+permissions:
+  contents: write   # allow pushing tags with GITHUB_TOKEN
+
 jobs:
   # 1. Validate PR into INT
   validate-int-pr:
