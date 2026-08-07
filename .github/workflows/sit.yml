@@ -49,7 +49,7 @@ jobs:
             --tests "$TEST_CLASSES"
 
   deploy-sit:
-    # Only run on push events into the sit branch
+    # Only run on push events into the sit branch itself
     if: github.event_name == 'push' && github.ref == 'refs/heads/sit'
     runs-on: ubuntu-latest
     steps:
