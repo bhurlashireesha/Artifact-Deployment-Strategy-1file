@@ -153,12 +153,12 @@
     <enableSharing>true</enableSharing>
     <enableStreamingApi>true</enableStreamingApi>
     <externalSharingModel>Private</externalSharingModel>
-    <label>Pachi</label>
+    <label>maguva</label>
     <nameField>
-        <label>Pachi Name</label>
+        <label>maguva Name</label>
         <type>Text</type>
     </nameField>
-    <pluralLabel>Pachii</pluralLabel>
+    <pluralLabel>maguva</pluralLabel>
     <searchLayouts></searchLayouts>
     <sharingModel>ReadWrite</sharingModel>
     <visibility>Public</visibility>

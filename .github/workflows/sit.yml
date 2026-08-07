@@ -73,4 +73,17 @@ jobs:
             FROM_SHA=$(git rev-list --max-parents=0 HEAD)
           fi
           ./scripts/delta.sh $TO_SHA $FROM_SHA
-      - name: Deploy
+      - name: Deploy to SIT (ignore conflicts)
+        run: |
+          if [ ! -s delta/package/package.xml ]; then
+            echo "No changes detected, skipping deployment."
+            exit 0
+          fi
+          TEST_CLASSES=$(grep -oPm1 "(?<=<members>)[^<]+" delta/package/package.xml | grep "Test" || true)
+          if [ -z "$TEST_CLASSES" ]; then TEST_CLASSES="SmokeTests"; fi
+          sf project deploy start \
+            --manifest delta/package/package.xml \
+            --target-org SIT \
+            --test-level RunSpecifiedTests \
+            --tests "$TEST_CLASSES" \
+            --ignore-conflicts
