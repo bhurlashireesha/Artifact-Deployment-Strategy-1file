@@ -10,7 +10,7 @@ on:
 jobs:
   validate-sit:
     # Only run if the PR base branch is sit
-    if: github.event.pull_request.base.ref == 'sit'
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'sit'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -49,7 +49,8 @@ jobs:
             --tests "$TEST_CLASSES"
 
   deploy-sit:
-    if: ${{ github.event_name == 'push' }}
+    # Only run on push events into the sit branch
+    if: github.event_name == 'push' && github.ref == 'refs/heads/sit'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
