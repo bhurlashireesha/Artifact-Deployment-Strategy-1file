@@ -1,0 +1,12 @@
+name: SIT Validation (PR)
+
+on:
+  pull_request:
+    branches: [ "sit" ]
+    types: [opened, reopened, synchronize]
+
+jobs:
+  validate-sit:
+    runs-on: ubuntu-latest
+    steps:
+      # same steps as your validate-sit job
