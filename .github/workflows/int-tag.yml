@@ -1,0 +1,37 @@
+name: INT Tagging
+
+on:
+  workflow_run:
+    workflows: ["INT Validation (PR)"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  create-int-tag:
+    if: ${{ success() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - name: Determine next tag
+        id: tag
+        run: |
+          git fetch --tags
+          LAST_TAG=$(git tag --list "INT-*" | sort -V | tail -n1)
+          if [ -z "$LAST_TAG" ]; then
+            NEW_TAG="INT-release1Sprint1-v1.0"
+          else
+            VERSION=$(echo $LAST_TAG | grep -oE 'v[0-9]+\.[0-9]+$' | sed 's/v//')
+            MAJOR=$(echo $VERSION | cut -d. -f1)
+            MINOR=$(echo $VERSION | cut -d. -f2)
+            NEW_TAG="INT-release1Sprint1-v${MAJOR}.$((MINOR+1))"
+          fi
+          echo "tag=$NEW_TAG" >> $GITHUB_OUTPUT
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.tag.outputs.tag }}
+          git push origin ${{ steps.tag.outputs.tag }}
